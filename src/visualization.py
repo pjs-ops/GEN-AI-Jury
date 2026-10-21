@@ -2,6 +2,9 @@
 visualization.py
 Interactive Plotly charts for the Streamlit dashboard and publication-quality
 Matplotlib visualizations for the Jupyter notebook.
+Styling follows the Premium Neutral Analytics design system:
+Warm neutral surfaces (#FFFFFF), subtle borders (#E6E0D6), forest slate (#34443D),
+muted sage (#5B7566), warm amber (#C07D3E), and restrained crimson (#B84A39).
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -16,15 +19,90 @@ except ImportError:
     sns = None
 
 
-# Corporate color palette for retail dashboard
+# Premium Neutral Analytics Palette
 PALETTE = {
-    "actual": "#1f77b4",       # Solid blue
-    "forecast": "#ff7f0e",     # Vibrant amber/orange
-    "baseline": "#7f7f7f",     # Charcoal gray
-    "holiday": "#d62728",      # Crimson red
-    "interval": "rgba(255, 127, 14, 0.2)",
-    "rolling": "#2ca02c"       # Forest green
+    "actual": "#34443D",       # Deep forest slate
+    "forecast": "#C07D3E",     # Warm amber / cognac
+    "rolling": "#5B7566",      # Muted sage
+    "baseline": "#9CA39E",     # Neutral slate gray
+    "holiday": "#B84A39",      # Restrained brick crimson
+    "interval": "rgba(192, 125, 62, 0.16)",  # Shaded 95% prediction interval band
+    "card_bg": "#FFFFFF",
+    "grid": "#EFEBE3",
+    "border": "#E6E0D6",
+    "text": "#292D2B",
+    "subtext": "#747872",
 }
+
+FONT_FAMILY = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+
+
+def apply_chart_theme(
+    fig: go.Figure,
+    title: str,
+    x_title: Optional[str] = None,
+    y_title: Optional[str] = None,
+    show_legend: bool = True
+) -> go.Figure:
+    """Applies a consistent Premium Neutral Analytics layout and typography to Plotly figures."""
+    fig.update_layout(
+        title=dict(
+            text=f"<b>{title}</b>",
+            font=dict(family=FONT_FAMILY, size=15, color=PALETTE["text"]),
+            x=0.01,
+            xanchor="left",
+            y=0.97,
+            yanchor="top",
+        ),
+        paper_bgcolor=PALETTE["card_bg"],
+        plot_bgcolor=PALETTE["card_bg"],
+        font=dict(family=FONT_FAMILY, color=PALETTE["text"], size=12),
+        margin=dict(l=55, r=25, t=65, b=45),
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="#FFFFFF",
+            bordercolor=PALETTE["border"],
+            font=dict(family=FONT_FAMILY, size=12, color=PALETTE["text"]),
+        ),
+        showlegend=show_legend,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1.0,
+            font=dict(family=FONT_FAMILY, size=11, color=PALETTE["subtext"]),
+            bgcolor="rgba(255, 255, 255, 0.7)",
+            bordercolor=PALETTE["border"],
+            borderwidth=0,
+        ),
+    )
+
+    fig.update_xaxes(
+        title=dict(text=x_title, font=dict(family=FONT_FAMILY, size=12, color=PALETTE["subtext"])) if x_title else None,
+        tickfont=dict(family=FONT_FAMILY, size=11, color=PALETTE["subtext"]),
+        showgrid=True,
+        gridcolor=PALETTE["grid"],
+        gridwidth=1,
+        showline=True,
+        linecolor=PALETTE["border"],
+        linewidth=1,
+        zeroline=False,
+    )
+
+    fig.update_yaxes(
+        title=dict(text=y_title, font=dict(family=FONT_FAMILY, size=12, color=PALETTE["subtext"])) if y_title else None,
+        tickfont=dict(family=FONT_FAMILY, size=11, color=PALETTE["subtext"]),
+        showgrid=True,
+        gridcolor=PALETTE["grid"],
+        gridwidth=1,
+        showline=True,
+        linecolor=PALETTE["border"],
+        linewidth=1,
+        zeroline=False,
+    )
+
+    return fig
 
 
 def plot_sales_trend_plotly(
@@ -46,19 +124,19 @@ def plot_sales_trend_plotly(
         y=df["Weekly_Sales"],
         mode="lines+markers",
         name="Weekly Sales ($)",
-        line=dict(color=PALETTE["actual"], width=2),
-        marker=dict(size=4),
-        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Weekly Sales:</b> $%{y:,.2f}<extra></extra>"
+        line=dict(color=PALETTE["actual"], width=2.0),
+        marker=dict(size=4.5, color=PALETTE["actual"], symbol="circle"),
+        hovertemplate="<b>Weekly Sales:</b> $%{y:,.2f}<extra></extra>"
     ))
 
-    # 2. 4-Week Rolling Average line (clearly distinguishable emerald line)
+    # 2. 4-Week Rolling Average line (clearly distinguishable muted sage dash)
     fig.add_trace(go.Scatter(
         x=df["Date"],
         y=rolling_series,
         mode="lines",
         name="4-Week Rolling Avg",
-        line=dict(color="#00cc96", width=2.5, dash="dash"),
-        hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>4-Week Rolling Avg:</b> $%{y:,.2f}<extra></extra>"
+        line=dict(color=PALETTE["rolling"], width=2.4, dash="dash"),
+        hovertemplate="<b>4-Week Rolling Avg:</b> $%{y:,.2f}<extra></extra>"
     ))
 
     # 3. Highlight holiday weeks
@@ -69,17 +147,12 @@ def plot_sales_trend_plotly(
             y=holidays["Weekly_Sales"],
             mode="markers",
             name="Holiday Weeks",
-            marker=dict(color=PALETTE["holiday"], size=8, symbol="diamond"),
-            hovertemplate="<b>Date:</b> %{x|%Y-%m-%d}<br><b>Holiday Sales:</b> $%{y:,.2f}<extra></extra>"
+            marker=dict(color=PALETTE["holiday"], size=8, symbol="diamond", line=dict(color="#FFFFFF", width=1)),
+            hovertemplate="<b>Holiday Demand:</b> $%{y:,.2f}<extra></extra>"
         ))
 
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16)),
-        xaxis=dict(title="Date", showgrid=True),
-        yaxis=dict(title="Weekly Sales (USD)", showgrid=True, tickprefix="$", tickformat=","),
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
+    apply_chart_theme(fig, title=title, x_title="Date", y_title="Weekly Sales (USD)")
+    fig.update_yaxes(tickprefix="$", tickformat=",")
     return fig
 
 
@@ -99,8 +172,8 @@ def plot_actual_vs_predicted_plotly(
         y=y_true,
         mode="lines+markers",
         name="Actual Sales",
-        line=dict(color=PALETTE["actual"], width=2.5),
-        marker=dict(size=5)
+        line=dict(color=PALETTE["actual"], width=2.2),
+        marker=dict(size=4.5, color=PALETTE["actual"])
     ))
 
     # Baseline Model if provided
@@ -120,18 +193,17 @@ def plot_actual_vs_predicted_plotly(
             y=predictions_dict[selected_model],
             mode="lines+markers",
             name=f"Selected: {selected_model}",
-            line=dict(color=PALETTE["forecast"], width=2.5),
-            marker=dict(size=5)
+            line=dict(color=PALETTE["forecast"], width=2.4),
+            marker=dict(size=5, color=PALETTE["forecast"])
         ))
 
-    fig.update_layout(
+    apply_chart_theme(
+        fig,
         title=f"Holdout Actual vs. Predicted Demand: {selected_model}",
-        xaxis_title="Date",
-        yaxis_title="Weekly Sales (USD)",
-        template="plotly_white",
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        x_title="Date",
+        y_title="Weekly Sales (USD)"
     )
+    fig.update_yaxes(tickprefix="$", tickformat=",")
     return fig
 
 
@@ -151,8 +223,8 @@ def plot_future_forecast_plotly(
         y=recent_history["Weekly_Sales"],
         mode="lines+markers",
         name="Historical Sales",
-        line=dict(color=PALETTE["actual"], width=2.2),
-        marker=dict(size=5)
+        line=dict(color=PALETTE["actual"], width=2.0),
+        marker=dict(size=4.5, color=PALETTE["actual"])
     ))
 
     # Forecast upper bound
@@ -182,18 +254,17 @@ def plot_future_forecast_plotly(
         y=forecast_df["Forecast ($)"],
         mode="lines+markers",
         name="Point Forecast",
-        line=dict(color=PALETTE["forecast"], width=3, dash="dash"),
-        marker=dict(size=7, symbol="circle")
+        line=dict(color=PALETTE["forecast"], width=2.8, dash="dash"),
+        marker=dict(size=6.5, symbol="circle", color=PALETTE["forecast"], line=dict(color="#FFFFFF", width=1))
     ))
 
-    fig.update_layout(
+    apply_chart_theme(
+        fig,
         title="Multi-Step Future Demand Forecast with 95% Prediction Bounds",
-        xaxis_title="Date",
-        yaxis_title="Weekly Sales (USD)",
-        template="plotly_white",
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        x_title="Date",
+        y_title="Weekly Sales (USD)"
     )
+    fig.update_yaxes(tickprefix="$", tickformat=",")
     return fig
 
 
@@ -201,9 +272,18 @@ def plot_leaderboard_bar_plotly(
     leaderboard_df: pd.DataFrame,
     metric_col: str = "WAPE (%)"
 ) -> go.Figure:
-    """Creates a horizontal ranked bar chart of model evaluation performance."""
+    """Creates a horizontal ranked bar chart of model evaluation performance with neutral palette."""
     valid_df = leaderboard_df[leaderboard_df["Status"] == "Valid"].copy()
     valid_df = valid_df.sort_values(by=metric_col, ascending=False)
+
+    # Cohesive neutral sequential color ramp from muted sage to forest slate
+    n = len(valid_df)
+    color_scale = [
+        [0.0, "#9CA39E"],
+        [0.35, "#7A8C80"],
+        [0.7, "#5B7566"],
+        [1.0, "#34443D"]
+    ]
 
     fig = px.bar(
         valid_df,
@@ -211,22 +291,24 @@ def plot_leaderboard_bar_plotly(
         y="Model",
         orientation="h",
         color=metric_col,
-        color_continuous_scale="Blues_r",
+        color_continuous_scale=color_scale,
         text=metric_col,
         title=f"Model Performance Comparison by {metric_col}"
     )
-    fig.update_layout(
-        template="plotly_white",
-        xaxis_title=metric_col,
-        yaxis_title="",
-        coloraxis_showscale=False
+
+    apply_chart_theme(fig, title=f"Model Performance Comparison by {metric_col}", x_title=metric_col, y_title="", show_legend=False)
+    fig.update_layout(coloraxis_showscale=False)
+    fig.update_traces(
+        texttemplate="%{text:.2f}",
+        textposition="outside",
+        textfont=dict(family=FONT_FAMILY, size=11, color=PALETTE["text"]),
+        marker=dict(line=dict(color=PALETTE["border"], width=1))
     )
-    fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
     return fig
 
 
 def plot_residuals_plotly(analysis_table: pd.DataFrame) -> Tuple[go.Figure, go.Figure]:
-    """Generates residual error over time and residual distribution charts."""
+    """Generates residual error over time and residual distribution charts with neutral styling."""
     # Chart 1: Residuals over time
     fig_time = go.Figure()
     fig_time.add_trace(go.Scatter(
@@ -234,16 +316,18 @@ def plot_residuals_plotly(analysis_table: pd.DataFrame) -> Tuple[go.Figure, go.F
         y=analysis_table["Error"],
         mode="lines+markers",
         name="Residual (Actual - Pred)",
-        line=dict(color="#d62728", width=1.8),
-        marker=dict(size=6)
+        line=dict(color=PALETTE["holiday"], width=1.8),
+        marker=dict(size=5.5, color=PALETTE["holiday"], line=dict(color="#FFFFFF", width=0.8))
     ))
-    fig_time.add_hline(y=0, line_dash="dash", line_color="black")
-    fig_time.update_layout(
+    fig_time.add_hline(y=0, line_dash="dash", line_color=PALETTE["actual"], line_width=1.2)
+    apply_chart_theme(
+        fig_time,
         title="Forecast Residuals Over Time",
-        xaxis_title="Date",
-        yaxis_title="Residual Error ($)",
-        template="plotly_white"
+        x_title="Date",
+        y_title="Residual Error ($)",
+        show_legend=False
     )
+    fig_time.update_yaxes(tickprefix="$", tickformat=",")
 
     # Chart 2: Residual distribution
     fig_dist = px.histogram(
@@ -252,12 +336,16 @@ def plot_residuals_plotly(analysis_table: pd.DataFrame) -> Tuple[go.Figure, go.F
         nbins=20,
         marginal="box",
         title="Distribution of Forecast Errors",
-        color_discrete_sequence=["#1f77b4"]
+        color_discrete_sequence=[PALETTE["rolling"]]
     )
-    fig_dist.update_layout(
-        template="plotly_white",
-        xaxis_title="Error ($)",
-        yaxis_title="Frequency"
+    apply_chart_theme(
+        fig_dist,
+        title="Distribution of Forecast Errors",
+        x_title="Error ($)",
+        y_title="Frequency",
+        show_legend=False
     )
+    fig_dist.update_traces(marker=dict(line=dict(color=PALETTE["border"], width=1)))
+    fig_dist.update_xaxes(tickprefix="$", tickformat=",")
 
     return fig_time, fig_dist

@@ -1,8 +1,9 @@
 """
 app.py
-Interactive Streamlit Dashboard for Retail Demand Forecasting.
-Designed for live college jury presentations with Plotly visualizations,
-8-model comparative analytics, multi-step future forecasting, and inventory decision support.
+Interactive Streamlit Dashboard for Retail Demand Forecasting & Inventory Decision Support.
+Designed for college project jury presentations with a Premium Neutral Analytics interface:
+Warm neutrals (#F4F1EB, #FFFFFF, #E6E0D6), deep forest slate (#34443D), muted sage (#66766B),
+warm amber (#C07D3E), and restrained red (#B84A39).
 """
 
 import os
@@ -40,44 +41,334 @@ from src.visualization import (
     plot_future_forecast_plotly,
     plot_leaderboard_bar_plotly,
     plot_residuals_plotly,
+    apply_chart_theme,
+    PALETTE,
 )
 
 
-# Set Streamlit Page Configuration
+# ---------------------------------------------------------
+# STREAMLIT PAGE CONFIGURATION
+# ---------------------------------------------------------
 st.set_page_config(
-    page_title="Retail Demand Forecasting System",
+    page_title="Retail Demand Forecasting | Decision Support",
     page_icon="🛒",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Custom Styling
+# ---------------------------------------------------------
+# PREMIUM NEUTRAL ANALYTICS DESIGN SYSTEM (CSS)
+# ---------------------------------------------------------
 st.markdown("""
 <style>
-    .metric-card {
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        padding: 16px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        border-left: 4px solid #1f77b4;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    /* Global Typography & Font Family */
+    html, body, [class*="css"], .stMarkdown, .stText {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: #292D2B;
     }
-    .metric-value {
-        font-size: 24px;
+
+    /* Main Container Padding - ample top padding to prevent ANY toolbar overlap */
+    .block-container {
+        padding-top: 5.5rem !important;
+        padding-bottom: 3.5rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 100%;
+        overflow: visible;
+    }
+
+    /* Header & Toolbar Overlay Fix */
+    header[data-testid="stHeader"] {
+        background-color: rgba(244, 241, 235, 0.95);
+        backdrop-filter: blur(8px);
+        z-index: 99;
+    }
+
+    /* Header & Badge Elements */
+    .system-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background-color: #EAEFE9;
+        color: #34443D;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        border: 1px solid #D5DDD4;
+        line-height: 1.4;
+        white-space: normal;
+        word-break: break-word;
+        overflow: visible;
+    }
+    .page-title {
+        font-size: 26px;
         font-weight: 700;
-        color: #1f77b4;
+        color: #34443D;
+        letter-spacing: -0.01em;
+        margin-top: 2px;
+        margin-bottom: 6px;
+        line-height: 1.3;
+        word-break: break-word;
+        overflow: visible;
+    }
+    .page-subtitle {
+        font-size: 13.5px;
+        color: #747872;
+        margin-bottom: 20px;
+        line-height: 1.5;
+        word-break: break-word;
+        overflow: visible;
+    }
+
+    /* Executive KPI Metric Cards */
+    .metric-card {
+        background-color: #FFFFFF;
+        border: 1px solid #E6E0D6;
+        border-top: 3px solid #34443D;
+        border-radius: 8px;
+        padding: 14px 16px;
+        min-height: auto;
+        height: auto;
+        box-shadow: 0 1px 3px rgba(41, 45, 43, 0.04);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        overflow: visible;
+        word-break: break-word;
+    }
+    .metric-card.accent {
+        border-top: 3px solid #66766B;
+    }
+    .metric-card.highlight {
+        border-top: 3px solid #C07D3E;
     }
     .metric-title {
-        font-size: 13px;
-        color: #6c757d;
+        font-size: 11px;
+        font-weight: 600;
+        color: #747872;
         text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 6px;
+        line-height: 1.35;
+        word-break: break-word;
     }
+    .metric-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: #34443D;
+        letter-spacing: -0.01em;
+        line-height: 1.25;
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+    .metric-sub {
+        font-size: 11px;
+        color: #66766B;
+        font-weight: 500;
+        margin-top: 4px;
+        line-height: 1.4;
+        word-break: break-word;
+    }
+
+    /* Panels & Content Containers */
+    .content-panel {
+        background-color: #FFFFFF;
+        border: 1px solid #E6E0D6;
+        border-radius: 8px;
+        padding: 18px 20px;
+        margin-bottom: 18px;
+        box-shadow: 0 1px 3px rgba(41, 45, 43, 0.03);
+        height: auto;
+        overflow: visible;
+    }
+    .panel-header {
+        font-size: 13px;
+        font-weight: 700;
+        color: #34443D;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        line-height: 1.4;
+        word-break: break-word;
+        overflow: visible;
+    }
+
+    /* Callout & Disclaimer Boxes */
     .disclaimer-box {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 12px;
+        background-color: #F6EBD2;
+        color: #6E5310;
+        padding: 12px 16px;
         border-radius: 6px;
-        border: 1px solid #ffeeba;
+        border: 1px solid #E5D5B5;
+        border-left: 4px solid #C07D3E;
+        margin-bottom: 18px;
+        font-size: 13px;
+        line-height: 1.5;
+        overflow: visible;
+        word-break: break-word;
+    }
+    .info-box {
+        background-color: #EAEFE9;
+        color: #292D2B;
+        padding: 12px 16px;
+        border-radius: 6px;
+        border: 1px solid #D5DDD4;
+        border-left: 4px solid #34443D;
         margin-bottom: 16px;
+        font-size: 13px;
+        line-height: 1.5;
+        overflow: visible;
+        word-break: break-word;
+    }
+
+    /* Insight Presentation Cards (Page 6) */
+    .insight-card {
+        background-color: #FFFFFF;
+        border: 1px solid #E6E0D6;
+        border-radius: 8px;
+        padding: 18px 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(41, 45, 43, 0.03);
+        height: auto;
+        overflow: visible;
+        word-break: break-word;
+    }
+    .insight-card-primary {
+        border-top: 3px solid #34443D;
+    }
+    .insight-card-secondary {
+        border-top: 3px solid #66766B;
+    }
+    .insight-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #34443D;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        line-height: 1.4;
+        word-break: break-word;
+    }
+
+    /* Sidebar Layout & Controls */
+    section[data-testid="stSidebar"] {
+        background-color: #EAEFE9;
+    }
+    div[data-testid="stSidebarContent"] {
+        padding-top: 2rem !important;
+        padding-left: 1.2rem;
+        padding-right: 1.2rem;
+        overflow-y: auto;
+    }
+    .sidebar-brand {
+        background: #34443D;
+        color: #FFFFFF;
+        padding: 14px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        word-break: break-word;
+    }
+    .sidebar-brand-title {
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #FFFFFF;
+        margin: 0;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+    .sidebar-brand-sub {
+        font-size: 11px;
+        color: #C2CBC5;
+        margin-top: 4px;
+        margin-bottom: 0;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+    .sidebar-section-title {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: #66766B;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-top: 14px;
+        margin-bottom: 6px;
+        line-height: 1.4;
+    }
+    .sidebar-footer {
+        font-size: 11px;
+        color: #747872;
+        padding: 10px 12px;
+        background: #FFFFFF;
+        border: 1px solid #E6E0D6;
+        border-radius: 6px;
+        margin-top: 22px;
+        line-height: 1.45;
+        word-break: break-word;
+    }
+
+    /* Tab Styling Overrides */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+        border-bottom: 1px solid #E6E0D6;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #747872;
+        border-radius: 4px 4px 0 0;
+        border-bottom: 2px solid transparent;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #34443D !important;
+        border-bottom: 2px solid #34443D !important;
+        background-color: transparent !important;
+    }
+
+    /* Primary Buttons & Downloads */
+    .stDownloadButton button, .stButton button {
+        background-color: #34443D !important;
+        color: #FFFFFF !important;
+        border: 1px solid #34443D !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        padding: 6px 16px !important;
+        transition: background-color 0.15s ease-in-out !important;
+    }
+    .stDownloadButton button:hover, .stButton button:hover {
+        background-color: #26332D !important;
+        border-color: #26332D !important;
+    }
+
+    /* Subtle Dataframe & Table Borders */
+    .stDataFrame {
+        border: 1px solid #E6E0D6;
+        border-radius: 6px;
+        background-color: #FFFFFF;
+    }
+
+    /* LaTeX Equation Card */
+    div[data-testid="stLatex"] {
+        background-color: #FFFFFF;
+        border: 1px solid #E6E0D6;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        overflow-x: auto;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -87,7 +378,7 @@ st.markdown("""
 # CACHED DATA & EVALUATION PIPELINES
 # ---------------------------------------------------------
 
-@st.cache_data(show_spinner="Loading Walmart Sales Data...")
+@st.cache_data(show_spinner="Loading Walmart Retail Datasets...")
 def load_and_merge_data():
     train, features, stores, test = load_raw_datasets()
     merged = prepare_merged_dataset(train, features, stores)
@@ -96,7 +387,7 @@ def load_and_merge_data():
     return merged, report, stores_list, dept_map
 
 
-@st.cache_data(show_spinner="Training and evaluating all 8 forecasting models...")
+@st.cache_data(show_spinner="Training and evaluating all 8 forecasting models across origins...")
 def run_model_evaluations(df_features_dict, horizon=4, n_splits=4):
     df_features = pd.DataFrame(df_features_dict)
     
@@ -110,11 +401,15 @@ def run_model_evaluations(df_features_dict, horizon=4, n_splits=4):
 
 
 # ---------------------------------------------------------
-# SIDEBAR CONTROLS
+# SIDEBAR NAVIGATION & PARAMETER CONTROLS
 # ---------------------------------------------------------
 
-st.sidebar.title("🛒 Demand Forecasting")
-st.sidebar.caption("Walmart Retail Sales Decision Support System")
+st.sidebar.markdown("""
+<div class="sidebar-brand">
+    <div class="sidebar-brand-title">Retail Forecasting Intelligence</div>
+    <div class="sidebar-brand-sub">Walmart Demand Decision Support Suite</div>
+</div>
+""", unsafe_allow_html=True)
 
 try:
     merged_df, global_report, stores_list, dept_map = load_and_merge_data()
@@ -122,28 +417,27 @@ except Exception as e:
     st.error(f"Failed to load dataset: {str(e)}")
     st.stop()
 
-st.sidebar.subheader("📍 Series Selection")
-selected_store = st.sidebar.selectbox("Store Number", stores_list, index=0)
+st.sidebar.markdown('<div class="sidebar-section-title">Series Selection</div>', unsafe_allow_html=True)
+selected_store = st.sidebar.selectbox("Store Location", stores_list, index=0, format_func=lambda s: f"Store #{s}")
 available_depts = dept_map.get(selected_store, [1])
-selected_dept = st.sidebar.selectbox("Department Number", available_depts, index=0)
+selected_dept = st.sidebar.selectbox("Department", available_depts, index=0, format_func=lambda d: f"Department #{d}")
 
-st.sidebar.subheader("⏱️ Forecasting Horizon")
+st.sidebar.markdown('<div class="sidebar-section-title">Forecasting Configuration</div>', unsafe_allow_html=True)
 horizon = st.sidebar.select_slider(
-    "Forecast Weeks Ahead",
+    "Forecast Horizon (Weeks Ahead)",
     options=[1, 2, 4, 8, 12, 16],
     value=8,
-    help="Number of future weeks to forecast beyond observed historical data."
+    help="Number of future weeks to project beyond historical observations."
 )
 
-st.sidebar.subheader("📐 Evaluation Metric")
 primary_metric = st.sidebar.selectbox(
     "Primary Selection Metric",
     options=["WAPE (%)", "RMSE ($)", "MAE ($)", "MAPE (%)"],
     index=0,
-    help="Volume-weighted absolute percentage error (WAPE) is recommended for retail."
+    help="Volume-weighted absolute percentage error (WAPE) weights errors by dollar volume, avoiding distortions from low-sales weeks."
 )
 
-# Navigation Menu
+st.sidebar.markdown('<div class="sidebar-section-title">Dashboard Navigation</div>', unsafe_allow_html=True)
 page = st.sidebar.radio(
     "Navigation Menu",
     [
@@ -152,12 +446,17 @@ page = st.sidebar.radio(
         "3. Model Leaderboard",
         "4. Demand Forecast",
         "5. Inventory Planning",
-        "6. Business & Jury Insights",
-    ]
+        "6. Business Insights",
+    ],
+    label_visibility="collapsed"
 )
 
-st.sidebar.markdown("---")
-st.sidebar.caption("Prototype built for Jury Presentation. Walmart sales represent monetary revenue ($).")
+st.sidebar.markdown("""
+<div class="sidebar-footer">
+    <strong>Academic Jury Prototype</strong><br>
+    Walmart sales denote monetary weekly revenue ($). Models strictly shift targets to prevent lookahead bias.
+</div>
+""", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
@@ -193,22 +492,25 @@ best_model = models_dict[winning_key_ro]
 # ---------------------------------------------------------
 
 if page == "1. Executive Overview":
-    st.title("🛒 Retail Demand Forecasting: Executive Overview")
+    st.markdown('<div class="system-badge">Executive Summary · Core Analytics</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Retail Demand Forecasting: Executive Overview</div>', unsafe_allow_html=True)
     st.markdown(
-        f"**Active Series:** Store **#{selected_store}** | Department **#{selected_dept}** "
-        f"({diagnostics['observations']} weekly observations from "
-        f"`{diagnostics['start_date'].strftime('%Y-%m-%d')}` to `{diagnostics['end_date'].strftime('%Y-%m-%d')}`)."
+        f'<div class="page-subtitle">Historical performance and model selection for <strong>Store #{selected_store}</strong>, '
+        f'<strong>Department #{selected_dept}</strong> &nbsp;|&nbsp; '
+        f'{diagnostics["observations"]} weekly observations spanning '
+        f'<code>{diagnostics["start_date"].strftime("%Y-%m-%d")}</code> to <code>{diagnostics["end_date"].strftime("%Y-%m-%d")}</code>.</div>',
+        unsafe_allow_html=True
     )
 
     st.markdown("""
     <div class="disclaimer-box">
-        <strong>📌 Walmart Dataset Notice:</strong> Weekly_Sales values represent <strong>monetary sales volume ($)</strong>, 
-        not physical inventory units. All baseline safety-stock and order projections are computed in monetary terms 
-        or under clearly declared scenario assumptions.
+        <strong>Domain Notice:</strong> In the Walmart dataset, <code>Weekly_Sales</code> represents <strong>monetary sales volume (USD)</strong>, 
+        not physical pieces sold. Baseline inventory buffers and reorder recommendations are formulated in monetary terms 
+        or via declared scenario parameters.
     </div>
     """, unsafe_allow_html=True)
 
-    # Top KPI Metrics Cards
+    # 5 Consistent KPI Cards
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
     
     total_sales = series_df["Weekly_Sales"].sum()
@@ -218,8 +520,9 @@ if page == "1. Executive Overview":
     with kpi1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-title">Total Historical Revenue</div>
+            <div class="metric-title">Historical Revenue</div>
             <div class="metric-value">${total_sales:,.0f}</div>
+            <div class="metric-sub">{diagnostics['observations']} total weeks</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -228,6 +531,7 @@ if page == "1. Executive Overview":
         <div class="metric-card">
             <div class="metric-title">Average Weekly Sales</div>
             <div class="metric-value">${avg_sales:,.0f}</div>
+            <div class="metric-sub">Std: ${series_df['Weekly_Sales'].std():,.0f}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -236,38 +540,39 @@ if page == "1. Executive Overview":
         <div class="metric-card">
             <div class="metric-title">Latest Observed Sales</div>
             <div class="metric-value">${latest_sales:,.0f}</div>
+            <div class="metric-sub">{series_df['Date'].max().strftime('%b %d, %Y')}</div>
         </div>
         """, unsafe_allow_html=True)
 
     with kpi4:
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card accent">
             <div class="metric-title">Best Validated Model</div>
-            <div class="metric-value" style="font-size: 18px;">{winning_row['Model']}</div>
+            <div class="metric-value" style="font-size: 17px; line-height: 1.3;">{winning_row['Model']}</div>
+            <div class="metric-sub">{winning_row['Type']} Family</div>
         </div>
         """, unsafe_allow_html=True)
 
     with kpi5:
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card highlight">
             <div class="metric-title">Winning {primary_metric}</div>
             <div class="metric-value">{winning_row[primary_metric]:.2f}%</div>
+            <div class="metric-sub">Rolling-Origin CV</div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("###")
-    
     # Overview Sales Trend Chart
     fig_trend = plot_sales_trend_plotly(
         clean_series_df,
-        title=f"Historical Demand & 4-Week Rolling Average — Store {selected_store}, Dept {selected_dept}"
+        title=f"Historical Demand & 4-Week Moving Average — Store {selected_store}, Dept {selected_dept}"
     )
     st.plotly_chart(fig_trend, use_container_width=True)
 
-    # Quick Summary Table
+    # Model Summary Table and Diagnostics Panel
     col_l, col_r = st.columns([3, 2])
     with col_l:
-        st.subheader("🏆 Model Selection Summary (Rolling-Origin Cross-Validation)")
+        st.markdown('<div class="panel-header">Model Selection Summary (Rolling-Origin Cross-Validation)</div>', unsafe_allow_html=True)
         st.dataframe(
             ranked_ro[["Rank", "Model", "Type", "WAPE (%)", "MAE ($)", "RMSE ($)", "MAPE (%)", "Status"]],
             hide_index=True,
@@ -275,13 +580,19 @@ if page == "1. Executive Overview":
         )
 
     with col_r:
-        st.subheader("📋 Dataset Diagnostics")
-        st.write(f"- **Total Rows Analyzed:** {diagnostics['observations']}")
-        st.write(f"- **Frequency Gaps Detected:** {diagnostics['gap_count']}")
-        st.write(f"- **Holiday Weeks in Series:** {(series_df['IsHoliday'] == 1).sum()}")
-        st.write(f"- **Standard Deviation of Sales:** ${series_df['Weekly_Sales'].std():,.2f}")
-        st.write(f"- **Highest Recorded Week:** ${series_df['Weekly_Sales'].max():,.2f}")
-        st.write(f"- **Lowest Recorded Week:** ${series_df['Weekly_Sales'].min():,.2f}")
+        st.markdown('<div class="panel-header">Data Integrity Diagnostics</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="content-panel" style="padding: 14px 18px; margin-bottom: 0px;">
+            <div style="font-size: 12.5px; color: #292D2B; line-height: 1.8;">
+                • <strong>Total Records Evaluated:</strong> {diagnostics['observations']} weeks<br>
+                • <strong>Temporal Gaps:</strong> {diagnostics['gap_count']} non-weekly intervals<br>
+                • <strong>Holiday Shopping Weeks:</strong> {(series_df['IsHoliday'] == 1).sum()} observed<br>
+                • <strong>Peak Demand Week:</strong> ${series_df['Weekly_Sales'].max():,.2f}<br>
+                • <strong>Lowest Demand Week:</strong> ${series_df['Weekly_Sales'].min():,.2f}<br>
+                • <strong>Lookahead Prevention:</strong> Shifted rolling statistics strictly enforced
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
@@ -289,21 +600,24 @@ if page == "1. Executive Overview":
 # ---------------------------------------------------------
 
 elif page == "2. Historical Sales EDA":
-    st.title("📊 Exploratory Data Analysis & Demand Drivers")
-    st.markdown("Examine seasonal demand cycles, holiday shopping surges, and promotional markdown impacts.")
+    st.markdown('<div class="system-badge">Exploratory Analysis · Demand Drivers</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Historical Sales Analysis & Seasonality</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="page-subtitle">Dissecting 52-week annual cycles, holiday demand shocks, and promotional markdown impacts.</div>',
+        unsafe_allow_html=True
+    )
 
     tab1, tab2, tab3 = st.tabs(["Weekly Seasonality & Trends", "Holiday Demand Surges", "Promotional Markdowns"])
 
     with tab1:
-        st.subheader(f"Historical Demand & 4-Week Rolling Average — Store #{selected_store}, Dept #{selected_dept}")
+        st.markdown(f'<div class="panel-header">Historical Sales & 4-Week Rolling Average — Store #{selected_store}, Dept #{selected_dept}</div>', unsafe_allow_html=True)
         fig_trend_eda = plot_sales_trend_plotly(
             clean_series_df,
             title=f"Historical Demand & 4-Week Rolling Average — Store {selected_store}, Dept {selected_dept}"
         )
         st.plotly_chart(fig_trend_eda, use_container_width=True)
 
-        st.markdown("---")
-        st.subheader("Annual Seasonal Profile (52-Week Cycle)")
+        st.markdown('<div class="panel-header" style="margin-top: 24px;">Annual Seasonal Profile (52-Week Recurrence Cycle)</div>', unsafe_allow_html=True)
         clean_series_df["Week_of_Year"] = clean_series_df["Date"].dt.isocalendar().week.astype(int)
         weekly_profile = clean_series_df.groupby("Week_of_Year")["Weekly_Sales"].agg(["mean", "std", "count"]).reset_index()
 
@@ -313,7 +627,8 @@ elif page == "2. Historical Sales EDA":
             y=weekly_profile["mean"],
             mode="lines+markers",
             name="Mean Weekly Sales",
-            line=dict(color="#1f77b4", width=3)
+            line=dict(color=PALETTE["actual"], width=2.4),
+            marker=dict(size=4.5, color=PALETTE["actual"])
         ))
         fig_seas.add_trace(go.Scatter(
             x=weekly_profile["Week_of_Year"],
@@ -327,31 +642,32 @@ elif page == "2. Historical Sales EDA":
             y=weekly_profile["mean"] - weekly_profile["std"].fillna(0),
             mode="lines",
             fill="tonexty",
-            fillcolor="rgba(31, 119, 180, 0.15)",
+            fillcolor="rgba(91, 117, 102, 0.16)",
             name="±1 Std Deviation Band",
             line=dict(width=0)
         ))
-        fig_seas.update_layout(
-            title="Average Sales by Week of Year (Annual Seasonality)",
-            xaxis_title="Week of Year (1 - 52)",
-            yaxis_title="Average Weekly Sales ($)",
-            template="plotly_white"
+        apply_chart_theme(
+            fig_seas,
+            title="52-Week Annual Demand Profile: Average Sales by Week of Year",
+            x_title="Week of Year (1 - 52)",
+            y_title="Average Sales (USD)"
         )
+        fig_seas.update_yaxes(tickprefix="$", tickformat=",")
         st.plotly_chart(fig_seas, use_container_width=True)
 
         col_top, col_low = st.columns(2)
         with col_top:
-            st.markdown("**Top 5 Peak Seasonal Weeks:**")
+            st.markdown('<div class="panel-header">Top 5 Peak Seasonal Weeks</div>', unsafe_allow_html=True)
             top_weeks = weekly_profile.sort_values(by="mean", ascending=False).head(5)
-            st.dataframe(top_weeks.rename(columns={"mean": "Avg Sales ($)", "std": "Std Dev ($)"}), hide_index=True)
+            st.dataframe(top_weeks.rename(columns={"mean": "Avg Sales ($)", "std": "Std Dev ($)"}), hide_index=True, use_container_width=True)
 
         with col_low:
-            st.markdown("**Lowest 5 Demand Weeks:**")
+            st.markdown('<div class="panel-header">Lowest 5 Demand Weeks</div>', unsafe_allow_html=True)
             low_weeks = weekly_profile.sort_values(by="mean", ascending=True).head(5)
-            st.dataframe(low_weeks.rename(columns={"mean": "Avg Sales ($)", "std": "Std Dev ($)"}), hide_index=True)
+            st.dataframe(low_weeks.rename(columns={"mean": "Avg Sales ($)", "std": "Std Dev ($)"}), hide_index=True, use_container_width=True)
 
     with tab2:
-        st.subheader("Holiday Demand vs. Normal Shopping Weeks")
+        st.markdown('<div class="panel-header">Holiday Demand vs. Normal Shopping Weeks</div>', unsafe_allow_html=True)
         
         hol_comp = clean_series_df.copy()
         hol_comp["Period_Type"] = hol_comp["IsHoliday"].apply(lambda x: "Holiday Week" if x == 1 else "Non-Holiday Week")
@@ -365,28 +681,33 @@ elif page == "2. Historical Sales EDA":
                 color="Period_Type",
                 points="all",
                 title="Sales Distribution: Holiday vs. Non-Holiday Weeks",
-                color_discrete_map={"Holiday Week": "#d62728", "Non-Holiday Week": "#1f77b4"}
+                color_discrete_map={"Holiday Week": PALETTE["holiday"], "Non-Holiday Week": PALETTE["actual"]}
             )
-            fig_box.update_layout(template="plotly_white", showlegend=False)
+            apply_chart_theme(fig_box, title="Sales Distribution: Holiday vs. Non-Holiday Weeks", x_title="", y_title="Weekly Sales (USD)", show_legend=False)
+            fig_box.update_yaxes(tickprefix="$", tickformat=",")
             st.plotly_chart(fig_box, use_container_width=True)
 
         with col_stat:
-            st.markdown("### Holiday Uplift Statistics")
+            st.markdown('<div class="panel-header">Holiday Demand Statistics</div>', unsafe_allow_html=True)
             hol_summary = hol_comp.groupby("Period_Type")["Weekly_Sales"].agg(["count", "mean", "median", "std"]).reset_index()
-            st.dataframe(hol_summary, hide_index=True)
+            st.dataframe(hol_summary, hide_index=True, use_container_width=True)
             
             non_hol_mean = hol_summary.loc[hol_summary["Period_Type"]=="Non-Holiday Week", "mean"].values[0]
             hol_mean = hol_summary.loc[hol_summary["Period_Type"]=="Holiday Week", "mean"].values[0]
             uplift_pct = ((hol_mean - non_hol_mean) / non_hol_mean) * 100.0
             
-            st.metric("Holiday Mean Uplift", f"{uplift_pct:+.1f}%", help="Percentage difference between holiday weeks and normal weeks.")
-            st.info("⚠️ Note: Group difference does not imply causation alone; Thanksgiving and Super Bowl represent distinct shopper behaviors.")
+            st.metric("Holiday Mean Uplift", f"{uplift_pct:+.1f}%", help="Percentage sales difference between holiday weeks and normal weeks.")
+            st.markdown("""
+            <div class="info-box" style="margin-top: 12px;">
+                <strong>Note on Causation:</strong> Group differences reflect seasonal shopping surges (Thanksgiving, Christmas) rather than holidays causing demand independently.
+            </div>
+            """, unsafe_allow_html=True)
 
     with tab3:
-        st.subheader("Promotional MarkDown Analysis (MarkDown1 – MarkDown5)")
+        st.markdown('<div class="panel-header">Promotional MarkDown Analysis (MarkDown1 – MarkDown5)</div>', unsafe_allow_html=True)
         st.markdown(
-            "Walmart began collecting markdown data in **November 2011**. Prior weeks are flagged as uncollected (`MarkDown_Available = 0`), "
-            "while post-November 2011 zeros represent confirmed non-promotional periods."
+            "Walmart began tracking promotional markdown figures in **November 2011**. Prior weeks are treated as uncollected (`MarkDown_Available = 0`), "
+            "while post-November 2011 nulls reflect confirmed zero-promotion periods."
         )
 
         md_cols = ["MarkDown1", "MarkDown2", "MarkDown3", "MarkDown4", "MarkDown5"]
@@ -395,18 +716,21 @@ elif page == "2. Historical Sales EDA":
         if available_mds:
             recent_promo = clean_series_df[clean_series_df["MarkDown_Available"] == 1].copy()
             if len(recent_promo) > 0:
+                neutral_promo_palette = ["#34443D", "#5B7566", "#7A8C80", "#C07D3E", "#A89F91"]
                 fig_md = px.bar(
                     recent_promo,
                     x="Date",
                     y=available_mds,
                     title="Promotional MarkDowns Over Time (Post-Nov 2011)",
-                    labels={"value": "MarkDown Value ($)", "variable": "Promotion Type"},
+                    labels={"value": "MarkDown ($)", "variable": "Promotion"},
+                    color_discrete_sequence=neutral_promo_palette,
                     barmode="stack"
                 )
-                fig_md.update_layout(template="plotly_white")
+                apply_chart_theme(fig_md, title="Promotional MarkDowns Over Time (Post-Nov 2011)", x_title="Date", y_title="Total MarkDown (USD)")
+                fig_md.update_yaxes(tickprefix="$", tickformat=",")
                 st.plotly_chart(fig_md, use_container_width=True)
             else:
-                st.info("No post-Nov 2011 observations in current selection.")
+                st.info("No post-November 2011 records available for the current selection.")
 
 
 # ---------------------------------------------------------
@@ -414,10 +738,12 @@ elif page == "2. Historical Sales EDA":
 # ---------------------------------------------------------
 
 elif page == "3. Model Leaderboard":
-    st.title("⚖️ Comprehensive Model Comparison Leaderboard")
+    st.markdown('<div class="system-badge">Model Evaluation · Comparative Benchmarking</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Forecasting Model Leaderboard & Diagnostics</div>', unsafe_allow_html=True)
     st.markdown(
-        "Compare all **eight forecasting models** under rigorous, leak-free evaluation criteria. "
-        "The winning model is selected programmatically based on the active selection metric."
+        '<div class="page-subtitle">Rigorous, leak-free evaluation of all eight model families using identical test slices. '
+        'The winning model is selected programmatically based on the active selection metric.</div>',
+        unsafe_allow_html=True
     )
 
     eval_tab1, eval_tab2, eval_tab3 = st.tabs([
@@ -427,10 +753,9 @@ elif page == "3. Model Leaderboard":
     ])
 
     with eval_tab1:
-        st.subheader(f"Rolling-Origin Cross-Validation Leaderboard (Ranked by {primary_metric})")
+        st.markdown(f'<div class="panel-header">Rolling-Origin CV Leaderboard (Ranked by {primary_metric})</div>', unsafe_allow_html=True)
         st.markdown(
-            "Evaluates models over 4 expanding training windows across multiple origins. "
-            "Measures how well each model generalizes to real-world multi-step horizons without lookahead bias."
+            "Evaluates models over 4 expanding training origins to measure genuine generalization capability across changing demand regimes."
         )
 
         fig_bar = plot_leaderboard_bar_plotly(ranked_ro, metric_col=primary_metric)
@@ -443,10 +768,8 @@ elif page == "3. Model Leaderboard":
         )
 
     with eval_tab2:
-        st.subheader("Chronological Holdout (80% Train, 20% Test)")
-        st.markdown(
-            "Single fixed-origin holdout evaluating on the final 19 consecutive weeks of available history."
-        )
+        st.markdown('<div class="panel-header">Chronological Holdout Evaluation (80% Train, 20% Out-of-Sample Test)</div>', unsafe_allow_html=True)
+        st.markdown("Evaluates models on the final 19 consecutive historical weeks without temporal shuffling.")
 
         st.dataframe(
             ranked_holdout[["Rank", "Model", "Type", "Evaluated Obs", "WAPE (%)", "MAE ($)", "RMSE ($)", "MAPE (%)", "Status"]],
@@ -454,7 +777,6 @@ elif page == "3. Model Leaderboard":
             use_container_width=True
         )
 
-        # Actual vs Predicted plot for selected model on Holdout
         model_options = list(holdout_preds.keys())
         comp_model_key = st.selectbox(
             "Select Model to Plot vs. Actual Sales",
@@ -473,7 +795,7 @@ elif page == "3. Model Leaderboard":
         st.plotly_chart(fig_holdout, use_container_width=True)
 
     with eval_tab3:
-        st.subheader("Forecast Residual Analysis for Winning Model")
+        st.markdown('<div class="panel-header">Forecast Residual Analysis for Winning Model</div>', unsafe_allow_html=True)
         if winning_key_holdout in holdout_preds:
             res_analysis = analyze_residuals_and_holidays(
                 test_df=test_df,
@@ -489,8 +811,8 @@ elif page == "3. Model Leaderboard":
             with c2:
                 st.plotly_chart(fig_res_dist, use_container_width=True)
 
-            st.markdown("### Top 5 Peak Forecast Errors in Test Set")
-            st.dataframe(pd.DataFrame(res_analysis["top_errors"]), hide_index=True)
+            st.markdown('<div class="panel-header" style="margin-top: 18px;">Top 5 Peak Forecast Errors in Test Period</div>', unsafe_allow_html=True)
+            st.dataframe(pd.DataFrame(res_analysis["top_errors"]), hide_index=True, use_container_width=True)
 
 
 # ---------------------------------------------------------
@@ -498,10 +820,12 @@ elif page == "3. Model Leaderboard":
 # ---------------------------------------------------------
 
 elif page == "4. Demand Forecast":
-    st.title("🔮 Multi-Step Future Demand Forecast")
+    st.markdown('<div class="system-badge">Future Horizon · Recursive Forecasting</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Multi-Step Demand Projections</div>', unsafe_allow_html=True)
     st.markdown(
-        f"Generate genuinely future sales projections beyond `{series_df['Date'].max().strftime('%Y-%m-%d')}`. "
-        "Lag features are updated recursively step-by-step to prevent lookahead bias."
+        f'<div class="page-subtitle">Project future sales beyond <code>{series_df["Date"].max().strftime("%Y-%m-%d")}</code>. '
+        'Lags and rolling statistics are propagated recursively step-by-step to prevent lookahead cheating.</div>',
+        unsafe_allow_html=True
     )
 
     col_m, col_h = st.columns([2, 1])
@@ -513,11 +837,10 @@ elif page == "4. Demand Forecast":
             format_func=lambda k: f"{models_dict[k].name} {'(★ Validated Winner)' if k == winning_key_ro else ''}"
         )
     with col_h:
-        forecast_horizon = st.number_input("Forecast Horizon (Weeks)", min_value=1, max_value=26, value=horizon)
+        forecast_horizon = st.number_input("Forecast Horizon (Weeks Ahead)", min_value=1, max_value=26, value=horizon)
 
     selected_forecaster = models_dict[forecast_model_key]
     
-    # Refit forecaster on full available clean history
     clean_history = feat_df.dropna(subset=["Lag_1", "Lag_2", "Lag_3", "Lag_4", "Lag_52", "Rolling_Mean_13"]).reset_index(drop=True)
     
     with st.spinner("Fitting selected model and generating future recursive predictions..."):
@@ -526,7 +849,6 @@ elif page == "4. Demand Forecast":
         else:
             selected_forecaster.fit(y=clean_history["Weekly_Sales"])
 
-        # Compute empirical residual standard deviation for prediction intervals
         residual_std = float(clean_history["Weekly_Sales"].std() * 0.15)
         future_df = generate_future_forecast(
             model=selected_forecaster,
@@ -545,20 +867,20 @@ elif page == "4. Demand Forecast":
     st.plotly_chart(fig_future, use_container_width=True)
 
     # Forecast Data Table & Export
-    st.subheader(f"Dated Forecast Schedule ({forecast_horizon} Weeks)")
+    st.markdown(f'<div class="panel-header" style="margin-top: 18px;">Dated Forecast Schedule ({forecast_horizon} Weeks)</div>', unsafe_allow_html=True)
     
     col_t, col_b = st.columns([3, 1])
     with col_t:
         st.dataframe(future_df, hide_index=True, use_container_width=True)
     with col_b:
-        st.markdown("### Export Forecast")
+        st.markdown('<div class="panel-header">Export Schedule</div>', unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 12px; color: #747872;'>Export point forecasts and 95% lower/upper bounds to CSV.</p>", unsafe_allow_html=True)
         csv_data = future_df.to_csv(index=False).encode("utf-8")
         st.download_button(
-            label="📥 Download Forecast CSV",
+            label="Download Forecast CSV",
             data=csv_data,
             file_name=f"sales_forecast_store{selected_store}_dept{selected_dept}.csv",
             mime="text/csv",
-            help="Export future dated predictions with lower and upper confidence bounds."
         )
 
 
@@ -567,65 +889,66 @@ elif page == "4. Demand Forecast":
 # ---------------------------------------------------------
 
 elif page == "5. Inventory Planning":
-    st.title("📦 Inventory & Replenishment Decision Support")
+    st.markdown('<div class="system-badge">Supply Chain · Replenishment Decision Support</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Inventory Replenishment & Safety Stock Planning</div>', unsafe_allow_html=True)
     st.markdown(
-        "Translate demand forecasts into actionable inventory replenishment decisions: "
-        "safety stock, reorder point (ROP), and target order-up-to level (S)."
+        '<div class="page-subtitle">Translate demand forecasts into continuous $(s, S)$ or periodic $(R, S)$ inventory control parameters.</div>',
+        unsafe_allow_html=True
     )
 
     st.markdown("""
     <div class="disclaimer-box">
-        <strong>⚠️ Crucial Business Clarification:</strong> Walmart's dataset records <strong>monetary weekly sales ($)</strong>, 
-        not physical pieces or cartons sold. To avoid confusing physical inventory with sales revenue, two scenarios are provided:
-        <br>1. <strong>Monetary Working Capital Scenario</strong>: Uses sales revenue ($) directly to compute buffer capital and replenishment budgets.
-        <br>2. <strong>Demonstration Unit Scenario</strong>: Converts monetary sales to synthetic physical units via an assumed Average Selling Price (ASP).
+        <strong>Supply Chain Context Notice:</strong> The Walmart dataset records <strong>monetary weekly sales ($)</strong>, 
+        not physical pieces or inventory stock records. To maintain mathematical integrity:
+        <br>1. <strong>Monetary Working Capital Scenario</strong>: Formulates replenishment budgets and safety working capital directly in dollars ($).
+        <br>2. <strong>Demonstration Unit Scenario</strong>: Converts monetary sales into synthetic physical units via an assumed Average Selling Price (ASP).
     </div>
     """, unsafe_allow_html=True)
 
     scenario_mode = st.radio(
-        "Select Decision Support Scenario:",
-        ["Monetary Working Capital Scenario ($)", "Demonstration Unit Scenario (Pieces)"]
+        "Select Decision Support Mode:",
+        ["Monetary Working Capital Scenario ($)", "Demonstration Unit Scenario (Pieces)"],
+        horizontal=True
     )
     is_monetary = scenario_mode.startswith("Monetary")
 
-    # Estimate default weekly forecast and demand std
     next_week_forecast = float(series_df["Weekly_Sales"].iloc[-1])
     est_demand_std = float(series_df["Weekly_Sales"].std())
 
     col_in1, col_in2, col_in3 = st.columns(3)
     
     with col_in1:
-        st.subheader("Demand & Lead Time")
+        st.markdown('<div class="panel-header">1. Demand & Lead Time</div>', unsafe_allow_html=True)
         if is_monetary:
             fcst_input = st.number_input("Expected Weekly Demand ($)", value=round(next_week_forecast, 2), step=1000.0)
-            std_input = st.number_input("Weekly Demand Uncertainty Std Dev ($)", value=round(est_demand_std, 2), step=500.0)
+            std_input = st.number_input("Weekly Demand Std Dev ($)", value=round(est_demand_std, 2), step=500.0)
             asp = 1.0
         else:
             asp = st.number_input("Assumed Average Selling Price ($/unit)", value=25.0, min_value=1.0, step=5.0)
             unit_forecast = round(next_week_forecast / asp, 1)
             unit_std = round(est_demand_std / asp, 1)
-            fcst_input = st.number_input("Expected Weekly Unit Demand (units)", value=unit_forecast, step=10.0)
-            std_input = st.number_input("Weekly Demand Uncertainty Std Dev (units)", value=unit_std, step=5.0)
+            fcst_input = st.number_input("Expected Weekly Demand (units)", value=unit_forecast, step=10.0)
+            std_input = st.number_input("Weekly Demand Std Dev (units)", value=unit_std, step=5.0)
 
         lead_time = st.slider("Supplier Lead Time (Weeks)", min_value=1, max_value=8, value=2)
 
     with col_in2:
-        st.subheader("Service Level & Review")
+        st.markdown('<div class="panel-header">2. Service Level & Review</div>', unsafe_allow_html=True)
         service_lvl = st.select_slider(
-            "Desired Cycle Service Level (%)",
+            "Cycle Service Level (%)",
             options=[85.0, 90.0, 95.0, 98.0, 99.0],
             value=95.0,
-            help="Higher service level guarantees higher product availability but requires larger safety buffers."
+            help="Higher service level minimizes stockout probability but requires larger safety buffers."
         )
-        review_period = st.slider("Replenishment Review Period (Weeks)", min_value=1, max_value=4, value=1)
+        review_period = st.slider("Review Period (Weeks)", min_value=1, max_value=4, value=1)
         z_val = SERVICE_LEVEL_Z.get(service_lvl, 1.645)
-        st.info(f"Normal Distribution Z-Score = **{z_val:.3f}**")
+        st.markdown(f"<div style='font-size: 12px; color: #66766B; margin-top: 4px;'>Normal Z-Score: <strong>{z_val:.3f}</strong></div>", unsafe_allow_html=True)
 
     with col_in3:
-        st.subheader("Current Stock Position")
+        st.markdown('<div class="panel-header">3. Current Stock Position</div>', unsafe_allow_html=True)
         unit_label = "$" if is_monetary else "units"
-        on_hand = st.number_input(f"Current On-Hand Inventory ({unit_label})", value=round(fcst_input * 1.5, 1), step=50.0)
-        on_order = st.number_input(f"Incoming Shipments On-Order ({unit_label})", value=round(fcst_input * 0.5, 1), step=50.0)
+        on_hand = st.number_input(f"On-Hand Stock ({unit_label})", value=round(fcst_input * 1.5, 1), step=50.0)
+        on_order = st.number_input(f"On-Order Shipments ({unit_label})", value=round(fcst_input * 0.5, 1), step=50.0)
         backorders = st.number_input(f"Customer Backorders ({unit_label})", value=0.0, step=10.0)
 
     # Compute inventory policy
@@ -642,23 +965,46 @@ elif page == "5. Inventory Planning":
         is_monetary_scenario=is_monetary
     )
 
-    st.markdown("---")
-    st.subheader("🎯 Replenishment Policy Outputs")
+    st.markdown('<div class="panel-header" style="margin-top: 24px;">Recommended Replenishment Policy Outputs</div>', unsafe_allow_html=True)
 
     o1, o2, o3, o4 = st.columns(4)
     with o1:
-        st.metric(f"Lead-Time Demand ({unit_label})", f"{inv_results['lead_time_demand']:,.1f}")
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Lead-Time Demand</div>
+            <div class="metric-value">{inv_results['lead_time_demand']:,.1f} {unit_label}</div>
+            <div class="metric-sub">{lead_time} weeks @ forecast</div>
+        </div>
+        """, unsafe_allow_html=True)
     with o2:
-        st.metric(f"Safety Buffer ({unit_label})", f"{inv_results['safety_stock']:,.1f}")
+        st.markdown(f"""
+        <div class="metric-card accent">
+            <div class="metric-title">Safety Buffer</div>
+            <div class="metric-value">{inv_results['safety_stock']:,.1f} {unit_label}</div>
+            <div class="metric-sub">{service_lvl:.0f}% service level</div>
+        </div>
+        """, unsafe_allow_html=True)
     with o3:
-        st.metric(f"Reorder Point ROP ({unit_label})", f"{inv_results['reorder_point']:,.1f}")
+        st.markdown(f"""
+        <div class="metric-card highlight">
+            <div class="metric-title">Reorder Point (ROP)</div>
+            <div class="metric-value">{inv_results['reorder_point']:,.1f} {unit_label}</div>
+            <div class="metric-sub">Trigger threshold</div>
+        </div>
+        """, unsafe_allow_html=True)
     with o4:
-        st.metric(f"Recommended Order ({unit_label})", f"{inv_results['order_quantity']:,.1f}", delta="Order Now" if inv_results["order_quantity"] > 0 else "Sufficient Stock")
+        order_status = "Place Order" if inv_results["order_quantity"] > 0 else "Stock Sufficient"
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Recommended Order (Q)</div>
+            <div class="metric-value">{inv_results['order_quantity']:,.1f} {unit_label}</div>
+            <div class="metric-sub" style="color: {'#B84A39' if inv_results['order_quantity'] > 0 else '#5B7566'}; font-weight: 600;">{order_status}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("### Underlying Mathematical Equations")
-    st.latex(r"D_L = \text{Forecast} \times L")
-    st.latex(r"SS = Z \times \sigma_D \times \sqrt{L + R}")
-    st.latex(r"ROP = D_L + SS")
+    st.markdown('<div class="panel-header" style="margin-top: 20px;">Mathematical Equations</div>', unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 13px; color: #747872; margin-bottom: 8px;'>Standardized Periodic Review (R, S) Formulation:</p>", unsafe_allow_html=True)
+    st.latex(r"D_L = \text{Forecast} \times L \quad\quad SS = Z \times \sigma_D \times \sqrt{L + R} \quad\quad ROP = D_L + SS")
     st.latex(r"\text{Order Quantity } Q = \max\left(0, (D_{L+R} + SS) - (\text{On-Hand} + \text{On-Order} - \text{Backorders})\right)")
 
 
@@ -666,39 +1012,58 @@ elif page == "5. Inventory Planning":
 # PAGE 6: BUSINESS & JURY INSIGHTS
 # ---------------------------------------------------------
 
-elif page == "6. Business & Jury Insights":
-    st.title("💡 Strategic Business Insights & Jury Takeaways")
+elif page == "6. Business Insights":
+    st.markdown('<div class="system-badge">Strategic Analysis · Academic Takeaways</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Executive Business Insights & Jury Takeaways</div>', unsafe_allow_html=True)
     st.markdown(
-        "Synthesize empirical findings from historical data analysis and forecasting models "
-        "to deliver executive recommendations for retail planning."
+        '<div class="page-subtitle">Synthesized empirical findings from 8 model benchmarks, seasonal shock diagnostics, and decision-support modeling.</div>',
+        unsafe_allow_html=True
     )
 
     c_left, c_right = st.columns(2)
 
     with c_left:
-        st.subheader("1. Empirical Model Superiority")
         st.markdown(f"""
-        - **Winning Model:** **{winning_row['Model']}** achieved a **{winning_row['WAPE (%)']:.2f}% WAPE** on rolling-origin cross-validation.
-        - **Baseline vs. Seasonality:** The original baseline linear regression achieved an error of **15.64% WAPE**. Incorporating 52-week lag and cyclical calendar harmonics slashed error by **> 73%**.
-        - **Why ML Models Excel:** Random Forest (**5.35% WAPE**) and Gradient Boosting (**6.38% WAPE**) demonstrated superior robustness across economic fluctuations and promotional shifts.
-        """)
+        <div class="insight-card insight-card-primary">
+            <div class="insight-title">1. Empirical Model Superiority & Seasonality</div>
+            <p style="font-size: 13px; color: #292D2B; line-height: 1.6;">
+                • <strong>Programmatic Winner:</strong> <strong>{winning_row['Model']}</strong> achieved a 
+                <strong>{winning_row['WAPE (%)']:.2f}% WAPE</strong> across multi-fold rolling validation.<br>
+                • <strong>Baseline Failure:</strong> The original 4-lag linear regression achieved <strong>15.64% WAPE</strong> 
+                because recent 4-week lags cannot anticipate annual holiday inflection points.<br>
+                • <strong>The Seasonal Fix:</strong> Incorporating <code>Lag_52</code> and cyclical harmonic sine/cosine features slashed forecasting error by <strong>> 73%</strong>.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.subheader("2. Holiday Shopping Surges")
         st.markdown("""
-        - Sales exhibit sharp seasonal peaks concentrated around Thanksgiving (Week 47) and pre-Christmas (Weeks 51–52).
-        - Non-holiday weeks show stable recurring baseline demand, meaning safety stock can be dynamically relaxed during non-peak quarters to free up working capital.
-        """)
+        <div class="insight-card insight-card-secondary">
+            <div class="insight-title">2. Holiday Demand Shock Reality</div>
+            <p style="font-size: 13px; color: #292D2B; line-height: 1.6;">
+                • <strong>Concentrated Volatility:</strong> Weekly sales surge dramatically during Thanksgiving (Week 47) and pre-Christmas (Weeks 51–52).<br>
+                • <strong>Working Capital Benefit:</strong> Non-holiday weeks exhibit predictable baseline demand. Inventory planners can dynamically compress safety buffers during off-peak quarters to liberate working capital.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
     with c_right:
-        st.subheader("3. Promotion & External Factor Reality")
         st.markdown("""
-        - **MarkDown Data Availability:** MarkDown tracking only started in November 2011. Pre-2011 models must rely on calendar and lag signals.
-        - **Local Festival Transferability:** The dataset reflects US consumer behavior. Local festivals like Diwali require confirmed local promotional and calendar data rather than direct US holiday proxies.
-        """)
+        <div class="insight-card insight-card-secondary">
+            <div class="insight-title">3. Promotion & External Factor Nuances</div>
+            <p style="font-size: 13px; color: #292D2B; line-height: 1.6;">
+                • <strong>Data Collection Gap:</strong> Walmart began tracking promotional markdowns in November 2011. Pre-2011 models must rely on calendar and lag signals.<br>
+                • <strong>Geographic Transferability:</strong> The dataset captures US consumer spending. Regional festival shocks (e.g. Diwali) require verified local promotional calendars rather than US holiday proxies.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.subheader("4. Actionable Business Recommendations")
         st.markdown("""
-        1. **Dynamic Safety Stock:** Implement lead-time safety stock scaled by demand standard deviation rather than static buffer weeks.
-        2. **Weekly Retraining:** Automatically retrain the winning seasonal regression model every Monday as new POS transactions finalize.
-        3. **Promotional Alignment:** Coordinate supplier purchase orders 4 weeks ahead of major promotional campaigns to satisfy order-up-to targets without stockouts.
-        """)
+        <div class="insight-card insight-card-primary">
+            <div class="insight-title">4. Actionable Business Recommendations</div>
+            <p style="font-size: 13px; color: #292D2B; line-height: 1.6;">
+                1. <strong>Dynamic Reorder Points:</strong> Scale safety stock with lead-time demand standard deviation rather than static week buffers.<br>
+                2. <strong>Weekly Retraining Pipeline:</strong> Automatically re-estimate seasonal regression parameters every Monday upon POS settlement.<br>
+                3. <strong>Promotional Alignment:</strong> Coordinate supplier purchase orders 4 weeks ahead of promotional events to prevent out-of-stock penalties.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
