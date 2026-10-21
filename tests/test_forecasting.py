@@ -49,6 +49,8 @@ from src.evaluation import (
     evaluate_holdout,
     evaluate_rolling_origin,
     build_ranked_leaderboard,
+    analyze_residuals_and_holidays,
+    evaluate_holdout_shocks_all_models,
 )
 from src.forecasting import generate_future_forecast, is_walmart_holiday
 from src.inventory import calculate_inventory_policy, get_z_score
@@ -312,3 +314,23 @@ def test_graceful_handling_short_series():
     naive.fit(short_df["Weekly_Sales"])
     pred = naive.predict(steps=4)
     assert len(pred) == 4
+
+
+def test_holiday_shock_evaluation(merged_dataset):
+    s, _ = get_series(merged_dataset, 1, 1)
+    clean = preprocess_series(s)
+    f = build_feature_dataframe(clean)
+    board, preds, test_df = evaluate_holdout(f, train_ratio=0.8)
+    
+    # Test analyze_residuals_and_holidays
+    res_analysis = analyze_residuals_and_holidays(test_df, preds["naive"])
+    assert "holiday_stats" in res_analysis
+    assert "Holiday" in res_analysis["holiday_stats"] or "Non-Holiday" in res_analysis["holiday_stats"]
+    
+    # Test evaluate_holdout_shocks_all_models
+    shock_df = evaluate_holdout_shocks_all_models(test_df, preds)
+    assert len(shock_df) == len(preds)
+    assert "Holiday Shock WAPE (%)" in shock_df.columns
+    assert "Non-Holiday WAPE (%)" in shock_df.columns
+    assert "Holiday Weeks (N)" in shock_df.columns
+

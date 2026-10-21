@@ -32,8 +32,9 @@ from src.evaluation import (
     evaluate_rolling_origin,
     build_ranked_leaderboard,
     analyze_residuals_and_holidays,
+    evaluate_holdout_shocks_all_models,
 )
-from src.forecasting import generate_future_forecast
+from src.forecasting import generate_future_forecast, KNOWN_HOLIDAY_WEEKS
 from src.inventory import calculate_inventory_policy, SERVICE_LEVEL_Z
 from src.visualization import (
     plot_sales_trend_plotly,
@@ -671,7 +672,16 @@ elif page == "2. Historical Sales EDA":
         
         hol_comp = clean_series_df.copy()
         hol_comp["Period_Type"] = hol_comp["IsHoliday"].apply(lambda x: "Holiday Week" if x == 1 else "Non-Holiday Week")
-        
+        hol_comp["Week_Num"] = hol_comp["Date"].dt.isocalendar().week.astype(int)
+
+        def map_walmart_event(row):
+            if row["IsHoliday"] == 1:
+                w = row["Week_Num"]
+                return KNOWN_HOLIDAY_WEEKS.get(w, "Other Holiday Week")
+            return "Regular Non-Holiday"
+
+        hol_comp["Event_Name"] = hol_comp.apply(map_walmart_event, axis=1)
+
         col_chart, col_stat = st.columns([3, 2])
         with col_chart:
             fig_box = px.box(
@@ -688,20 +698,61 @@ elif page == "2. Historical Sales EDA":
             st.plotly_chart(fig_box, use_container_width=True)
 
         with col_stat:
-            st.markdown('<div class="panel-header">Holiday Demand Statistics</div>', unsafe_allow_html=True)
+            st.markdown('<div class="panel-header">Aggregate Holiday Statistics</div>', unsafe_allow_html=True)
             hol_summary = hol_comp.groupby("Period_Type")["Weekly_Sales"].agg(["count", "mean", "median", "std"]).reset_index()
-            st.dataframe(hol_summary, hide_index=True, use_container_width=True)
+            total_n = len(hol_comp)
+            hol_summary["Share (%)"] = ((hol_summary["count"] / total_n) * 100.0).round(1)
             
-            non_hol_mean = hol_summary.loc[hol_summary["Period_Type"]=="Non-Holiday Week", "mean"].values[0]
-            hol_mean = hol_summary.loc[hol_summary["Period_Type"]=="Holiday Week", "mean"].values[0]
+            non_hol_mean = hol_summary.loc[hol_summary["Period_Type"]=="Non-Holiday Week", "mean"].values[0] if (hol_summary["Period_Type"]=="Non-Holiday Week").any() else 1.0
+            hol_mean = hol_summary.loc[hol_summary["Period_Type"]=="Holiday Week", "mean"].values[0] if (hol_summary["Period_Type"]=="Holiday Week").any() else non_hol_mean
             uplift_pct = ((hol_mean - non_hol_mean) / non_hol_mean) * 100.0
             
-            st.metric("Holiday Mean Uplift", f"{uplift_pct:+.1f}%", help="Percentage sales difference between holiday weeks and normal weeks.")
-            st.markdown("""
-            <div class="info-box" style="margin-top: 12px;">
-                <strong>Note on Causation:</strong> Group differences reflect seasonal shopping surges (Thanksgiving, Christmas) rather than holidays causing demand independently.
-            </div>
-            """, unsafe_allow_html=True)
+            table_display = hol_summary.rename(columns={
+                "Period_Type": "Period",
+                "count": "Obs (N)",
+                "mean": "Mean Sales ($)",
+                "median": "Median ($)",
+                "std": "Std Dev ($)",
+                "Share (%)": "Share (%)"
+            })
+            table_display["Mean Sales ($)"] = table_display["Mean Sales ($)"].apply(lambda x: f"${x:,.2f}")
+            table_display["Median ($)"] = table_display["Median ($)"].apply(lambda x: f"${x:,.2f}")
+            table_display["Std Dev ($)"] = table_display["Std Dev ($)"].apply(lambda x: f"${x:,.2f}")
+            table_display["Share (%)"] = table_display["Share (%)"].apply(lambda x: f"{x:.1f}%")
+            st.dataframe(table_display, hide_index=True, use_container_width=True)
+
+            c_met1, c_met2 = st.columns(2)
+            with c_met1:
+                st.metric("Holiday Mean Uplift", f"{uplift_pct:+.1f}%", help="Percentage difference in average sales between holiday and non-holiday weeks.")
+            with c_met2:
+                n_holidays = int(hol_summary.loc[hol_summary["Period_Type"]=="Holiday Week", "count"].values[0]) if (hol_summary["Period_Type"]=="Holiday Week").any() else 0
+                st.metric("Holiday Sample Size", f"{n_holidays} weeks", delta=f"{n_holidays/total_n*100:.1f}% of total", delta_color="off")
+
+        # Granular event-by-event breakdown
+        st.markdown('<div class="panel-header" style="margin-top: 18px;">Specific Retail Event Breakdown (Department Demand Sensitivity)</div>', unsafe_allow_html=True)
+        event_summary = hol_comp.groupby("Event_Name")["Weekly_Sales"].agg(["count", "mean", "median", "std"]).reset_index()
+        event_summary["Uplift vs. Regular (%)"] = event_summary["mean"].apply(
+            lambda m: f"{((m - non_hol_mean) / non_hol_mean) * 100.0:+.1f}%"
+        )
+        event_display = event_summary.rename(columns={
+            "Event_Name": "Retail Event / Period",
+            "count": "Obs (N)",
+            "mean": "Mean Weekly Sales ($)",
+            "median": "Median Sales ($)",
+            "std": "Std Dev ($)"
+        })
+        event_display["Mean Weekly Sales ($)"] = event_display["Mean Weekly Sales ($)"].apply(lambda x: f"${x:,.2f}")
+        event_display["Median Sales ($)"] = event_display["Median Sales ($)"].apply(lambda x: f"${x:,.2f}")
+        event_display["Std Dev ($)"] = event_display["Std Dev ($)"].apply(lambda x: f"${x:,.2f}")
+        st.dataframe(event_display, hide_index=True, use_container_width=True)
+
+        st.markdown("""
+        <div class="info-box" style="margin-top: 12px;">
+            <strong>Methodological & Causal Caution:</strong> 
+            Observed sales differences reflect seasonal retail calendar timing (e.g. pre-Thanksgiving grocery prep or Super Bowl snacking surges) rather than proof that a holiday calendar flag in isolation directly caused the revenue uplift. 
+            Furthermore, not all holidays cause increases: demand varies sharply across departments, and certain categories experience neutral or negative shifts immediately after major events.
+        </div>
+        """, unsafe_allow_html=True)
 
     with tab3:
         st.markdown('<div class="panel-header">Promotional MarkDown Analysis (MarkDown1 – MarkDown5)</div>', unsafe_allow_html=True)
@@ -813,6 +864,40 @@ elif page == "3. Model Leaderboard":
 
             st.markdown('<div class="panel-header" style="margin-top: 18px;">Top 5 Peak Forecast Errors in Test Period</div>', unsafe_allow_html=True)
             st.dataframe(pd.DataFrame(res_analysis["top_errors"]), hide_index=True, use_container_width=True)
+
+            # Holiday vs Non-Holiday Error Breakdown for Winning Model
+            st.markdown(f'<div class="panel-header" style="margin-top: 24px;">Shock-Period Performance: Holiday vs. Non-Holiday Errors ({models_dict[winning_key_holdout].name})</div>', unsafe_allow_html=True)
+            hol_records = []
+            for period_lbl, s in res_analysis["holiday_stats"].items():
+                hol_records.append({
+                    "Period Type": f"{period_lbl} Shock Window" if period_lbl == "Holiday" else "Non-Holiday Baseline",
+                    "Obs (N)": s["Count"],
+                    "Mean Actual ($)": f"${s['Mean_Actual']:,.2f}",
+                    "Mean Predicted ($)": f"${s.get('Mean_Predicted', 0.0):,.2f}",
+                    "MAE ($)": f"${s['MAE']:,.2f}",
+                    "RMSE ($)": f"${s.get('RMSE', 0.0):,.2f}",
+                    "WAPE (%)": f"{s['WAPE']:.2f}%",
+                    "MAPE (%)": f"{s.get('MAPE', 0.0):,.2f}%"
+                })
+            st.dataframe(pd.DataFrame(hol_records), hide_index=True, use_container_width=True)
+
+            # Multi-Model Shock Comparison across all 8 models
+            st.markdown('<div class="panel-header" style="margin-top: 20px;">Comparative Shock Robustness Across All 8 Models (Holdout Test Period)</div>', unsafe_allow_html=True)
+            df_shocks = evaluate_holdout_shocks_all_models(
+                test_df=test_df,
+                predictions_dict=holdout_preds,
+                models_dict=models_dict
+            )
+            st.dataframe(df_shocks, hide_index=True, use_container_width=True)
+
+            st.markdown("""
+            <div class="info-box" style="margin-top: 12px;">
+                <strong>Statistical Caution on Small Sample Size:</strong> 
+                In this 80/20 chronological holdout test set (19 weeks), exactly <strong>N = 1 holiday observation</strong> (Labor Day, 2012-09-07) is evaluated. 
+                Error metrics derived from a single holiday point carry high sampling variance and should not be treated as a definitive evaluation of holiday shock capability in isolation. 
+                For robust holiday evaluation spanning Thanksgiving, Christmas, and Super Bowl across multiple seasonal years, refer to the <strong>Multi-Origin Cross-Validation Leaderboard</strong> (Tab 1).
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
@@ -1031,17 +1116,18 @@ elif page == "6. Business Insights":
                 <strong>{winning_row['WAPE (%)']:.2f}% WAPE</strong> across multi-fold rolling validation.<br>
                 • <strong>Baseline Failure:</strong> The original 4-lag linear regression achieved <strong>15.64% WAPE</strong> 
                 because recent 4-week lags cannot anticipate annual holiday inflection points.<br>
-                • <strong>The Seasonal Fix:</strong> Incorporating <code>Lag_52</code> and cyclical harmonic sine/cosine features slashed forecasting error by <strong>> 73%</strong>.
+                • <strong>The Seasonal Fix:</strong> Incorporating <code>Lag_52</code> and cyclical harmonic sine/cosine features slashed forecasting error by <strong>> 73%</strong> by capturing the 52-week recurring festival loop.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown("""
         <div class="insight-card insight-card-secondary">
-            <div class="insight-title">2. Holiday Demand Shock Reality</div>
+            <div class="insight-title">2. Retail Demand Shocks: Holiday & Promotion Mechanics</div>
             <p style="font-size: 13px; color: #292D2B; line-height: 1.6;">
-                • <strong>Concentrated Volatility:</strong> Weekly sales surge dramatically during Thanksgiving (Week 47) and pre-Christmas (Weeks 51–52).<br>
-                • <strong>Working Capital Benefit:</strong> Non-holiday weeks exhibit predictable baseline demand. Inventory planners can dynamically compress safety buffers during off-peak quarters to liberate working capital.
+                • <strong>Mechanics of Retail Shocks:</strong> Promotions and festivals generate sudden demand spikes through anticipatory pantry-loading, often succeeded by immediate post-event demand troughs (sales cannibalization).<br>
+                • <strong>Asymmetric Departmental Sensitivity:</strong> Not all holidays increase demand. For example, Super Bowl generates dramatic surges in snack/beverage departments while leaving others unaffected; Thanksgiving drives general merchandise surges; post-Christmas often sees sharp volume drops.<br>
+                • <strong>Non-Causality of Simple Averages:</strong> Differences in holiday averages reflect broader seasonal consumer calendars rather than proof that a calendar marker in isolation directly caused revenue uplift.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -1049,21 +1135,28 @@ elif page == "6. Business Insights":
     with c_right:
         st.markdown("""
         <div class="insight-card insight-card-secondary">
-            <div class="insight-title">3. Promotion & External Factor Nuances</div>
+            <div class="insight-title">3. Operational Shock Management: Recurring vs. Unprecedented Events</div>
             <p style="font-size: 13px; color: #292D2B; line-height: 1.6;">
-                • <strong>Data Collection Gap:</strong> Walmart began tracking promotional markdowns in November 2011. Pre-2011 models must rely on calendar and lag signals.<br>
-                • <strong>Geographic Transferability:</strong> The dataset captures US consumer spending. Regional festival shocks (e.g. Diwali) require verified local promotional calendars rather than US holiday proxies.
+                • <strong>Recurring vs. Unprecedented Shocks:</strong><br>
+                &nbsp;&nbsp;– <em>Known Recurring Events:</em> Annual retail calendar milestones with historical precedents (e.g. Thanksgiving, Christmas). Modeled with calendar indicator variables, <code>Lag_52</code>, and pre-scheduled promotional budgets.<br>
+                &nbsp;&nbsp;– <em>Unprecedented / Non-Recurring Shocks:</em> Black swan disruptions, extreme weather events, or macroeconomic inflection points with no prior training pattern.<br>
+                • <strong>Practical 4-Step Operational Response:</strong><br>
+                &nbsp;&nbsp;1. <em>High-Frequency Monitoring:</em> Track weekly tracking signals and forecast residuals as peak shock windows approach.<br>
+                &nbsp;&nbsp;2. <em>Scheduled Information Injection:</em> Pass known future promotional budgets and calendar flags into multi-step recursive forecasting without lookahead bias.<br>
+                &nbsp;&nbsp;3. <em>Historical Analog Calibration:</em> Base initial event forecasts on comparable historical festival patterns rather than flat trends.<br>
+                &nbsp;&nbsp;4. <em>Dynamic Inventory Buffers:</em> Expand $(R, S)$ safety stock dynamically during high-volatility shock windows to protect service levels without permanent capital lockup.
             </p>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown("""
         <div class="insight-card insight-card-primary">
-            <div class="insight-title">4. Actionable Business Recommendations</div>
+            <div class="insight-title">4. Cross-Market Transferability & Methodological Boundaries</div>
             <p style="font-size: 13px; color: #292D2B; line-height: 1.6;">
-                1. <strong>Dynamic Reorder Points:</strong> Scale safety stock with lead-time demand standard deviation rather than static week buffers.<br>
-                2. <strong>Weekly Retraining Pipeline:</strong> Automatically re-estimate seasonal regression parameters every Monday upon POS settlement.<br>
-                3. <strong>Promotional Alignment:</strong> Coordinate supplier purchase orders 4 weeks ahead of promotional events to prevent out-of-stock penalties.
+                • <strong>Dataset Scope:</strong> The Walmart dataset is strictly US-focused, comprising Super Bowl, Labor Day, Thanksgiving, and Christmas. No Indian festivals are recorded in this dataset, and none have been simulated.<br>
+                • <strong>Adaptation for Indian Retail Environments (Hypothetical):</strong><br>
+                &nbsp;&nbsp;– <em>Lunisolar Calendar Shifting:</em> Indian festivals (e.g. Diwali, Dussehra, Eid) shift by 10–20 Gregorian days annually. A rigid <code>Lag_52</code> would misalign with the festival week. Adaptation requires event-relative distance features (e.g. <code>Days_to_Diwali</code>, <code>Weeks_to_Diwali</code>) and localized retail promotional schedules.<br>
+                &nbsp;&nbsp;– <em>Selective Category Explosions:</em> Festive gifting, ethnic apparel, consumer electronics, and confectionery surge exponentially, requiring category-specific model weighting.
             </p>
         </div>
         """, unsafe_allow_html=True)

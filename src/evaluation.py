@@ -295,7 +295,10 @@ def analyze_residuals_and_holidays(
             holiday_stats[label] = {
                 "Count": len(subset),
                 "Mean_Actual": round(float(subset["Actual"].mean()), 2),
+                "Mean_Predicted": round(float(subset["Predicted"].mean()), 2),
                 "MAE": round(float(subset["Abs_Error"].mean()), 2),
+                "RMSE": round(calculate_rmse(subset["Actual"].values, subset["Predicted"].values), 2),
+                "MAPE": round(calculate_mape(subset["Actual"].values, subset["Predicted"].values), 2),
                 "WAPE": round(calculate_wape(subset["Actual"].values, subset["Predicted"].values), 2)
             }
 
@@ -311,3 +314,53 @@ def analyze_residuals_and_holidays(
         "residual_mean": float(analysis["Error"].mean()),
         "residual_std": float(analysis["Error"].std())
     }
+
+
+def evaluate_holdout_shocks_all_models(
+    test_df: pd.DataFrame,
+    predictions_dict: Dict[str, np.ndarray],
+    models_dict: Optional[Dict[str, BaseForecaster]] = None,
+    target_col: str = "Weekly_Sales"
+) -> pd.DataFrame:
+    """
+    Evaluates forecasting errors (WAPE and MAE) separately for holiday shock weeks
+    and non-holiday baseline weeks across all candidate models in the holdout test set.
+    Includes explicit sample counts (N) for rigorous sample-size transparency.
+    """
+    models_dict = models_dict or get_all_models()
+    is_hol = test_df["IsHoliday"].values == 1 if "IsHoliday" in test_df.columns else np.zeros(len(test_df), dtype=bool)
+    n_hol = int(np.sum(is_hol))
+    n_non_hol = int(np.sum(~is_hol))
+    y_true = test_df[target_col].values
+
+    rows = []
+    for key, preds in predictions_dict.items():
+        model_name = models_dict[key].name if key in models_dict else key
+        overall_wape = calculate_wape(y_true, preds)
+        overall_mae = calculate_mae(y_true, preds)
+
+        if n_hol > 0:
+            hol_wape = calculate_wape(y_true[is_hol], preds[is_hol])
+            hol_mae = calculate_mae(y_true[is_hol], preds[is_hol])
+        else:
+            hol_wape, hol_mae = np.nan, np.nan
+
+        if n_non_hol > 0:
+            non_wape = calculate_wape(y_true[~is_hol], preds[~is_hol])
+            non_mae = calculate_mae(y_true[~is_hol], preds[~is_hol])
+        else:
+            non_wape, non_mae = np.nan, np.nan
+
+        rows.append({
+            "Model": model_name,
+            "Overall WAPE (%)": round(overall_wape, 2),
+            "Non-Holiday WAPE (%)": round(non_wape, 2),
+            "Holiday Shock WAPE (%)": round(hol_wape, 2),
+            "Non-Holiday MAE ($)": round(non_mae, 2),
+            "Holiday Shock MAE ($)": round(hol_mae, 2),
+            "Holiday Weeks (N)": n_hol,
+            "Non-Holiday Weeks (N)": n_non_hol,
+        })
+
+    return pd.DataFrame(rows).sort_values("Overall WAPE (%)").reset_index(drop=True)
+
